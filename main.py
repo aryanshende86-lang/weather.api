@@ -1,11 +1,12 @@
 import os
 import json
 import requests
-import os
-from dotenv import load_dotenv  
-load_dotenv() 
+from dotenv import load_dotenv
+
+load_dotenv()
 
 API_KEY = os.getenv("OPENWEATHER_API_KEY")
+
 WEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
 AIR_URL = "https://api.openweathermap.org/data/2.5/air_pollution"
 HISTORY_FILE = "history.json"
@@ -57,26 +58,21 @@ def aqi_advice(aqi):
 
 
 def get_weather(city):
-    global API_KEY
     try:
         params = {
-            "q" : city,
+            "q": city,
             "appid": API_KEY,
-            "units" : "metric"
-            
+            "units": "metric"
         }
 
         response = requests.get(WEATHER_URL, params=params, timeout=10)
 
         if response.status_code == 404:
-            print("City not found. Please check the spelling and try again.")
+            print("City not found. Please check the spelling.")
             return None
 
         response.raise_for_status()
         data = response.json()
-
-        lat = data["coord"]["lat"]
-        lon = data["coord"]["lon"]
 
         return {
             "city": data["name"],
@@ -85,53 +81,54 @@ def get_weather(city):
             "humidity": data["main"]["humidity"],
             "wind_speed": round(data["wind"]["speed"] * 3.6, 1),
             "condition": data["weather"][0]["description"].title(),
-            "lat": lat,
-            "lon": lon
+            "lat": data["coord"]["lat"],
+            "lon": data["coord"]["lon"]
         }
 
     except requests.exceptions.RequestException:
         print("Network error. Please check your internet connection.")
     except KeyError:
-        print("Unexpected data format received from weather API.")
+        print("Unexpected data received from weather API.")
 
     return None
 
 
 def get_aqi(lat, lon):
-    global API_KEY
     try:
         params = {
-            "lat" : lat,
-            "lon" : lon,
+            "lat": lat,
+            "lon": lon,
             "appid": API_KEY
         }
 
         response = requests.get(AIR_URL, params=params, timeout=10)
         response.raise_for_status()
+
         data = response.json()
 
         return data["list"][0]["main"]["aqi"]
 
     except requests.exceptions.RequestException:
         print("Could not fetch AQI data.")
-    except:
-        print("Unexpected data format received from AQI API.")
+    except KeyError:
+        print("Unexpected AQI response.")
 
     return None
 
 
 def show_weather(info, aqi):
     print(f"\nWeather in {info['city']}")
-    print(f"Temperature : {info['temp']}°C (Feels like {info['feels_like']}°C)")
+    print(f"Temperature : {info['temp']}°C")
+    print(f"Feels Like : {info['feels_like']}°C")
     print(f"Humidity : {info['humidity']}%")
     print(f"Wind Speed : {info['wind_speed']} km/h")
     print(f"Condition : {info['condition']}")
 
     if aqi is not None:
-        print(f"Air Quality Index: {aqi} — {aqi_text(aqi)}")
-        print(f"Advisory: {aqi_advice(aqi)}")
+        print(f"AQI : {aqi} - {aqi_text(aqi)}")
+        print(f"Advisory : {aqi_advice(aqi)}")
     else:
-        print("Air Quality Index: Not available")
+        print("AQI : Not available")
 
 
 def show_history(history):
@@ -139,33 +136,45 @@ def show_history(history):
         print("No history found.")
         return
 
-    print("\nSearch History:")
+    print("\nSearch History")
+
     for item in history:
-        print(f"\nCity: {item['city']}")
-        print(f"Temperature: {item['temp']}°C")
-        print(f"Feels like: {item['feels_like']}°C")
-        print(f"Humidity: {item['humidity']}%")
-        print(f"Wind Speed: {item['wind_speed']} km/h")
-        print(f"Condition: {item['condition']}")
-        print(f"AQI: {item.get('aqi', 'N/A')} ({item.get('aqi_label', 'Unknown')})")
+        print("-" * 40)
+        print(f"City: {item.get('city', 'N/A')}")
+        print(f"Temperature: {item.get('temp', 'N/A')}°C")
+        print(f"Feels Like: {item.get('feels_like', 'N/A')}°C")
+        print(f"Humidity: {item.get('humidity', 'N/A')}%")
+        print(f"Wind Speed: {item.get('wind_speed', 'N/A')} km/h")
+        print(f"Condition: {item.get('condition', 'N/A')}")
+        print(
+            f"AQI: {item.get('aqi', 'N/A')} "
+            f"({item.get('aqi_label', 'Unknown')})"
+        )
         print(f"Advisory: {item.get('aqi_advice', 'Not available')}")
 
 
 def main():
     if not API_KEY:
-        print("API key not found. Please set OPENWEATHER_API_KEY in your environment.")
+        print("OPENWEATHER_API_KEY not found.")
         return
 
     history = load_history()
 
     if history:
         last = history[0]
-        print(f"Last search: {last['city']} - {last['temp']}°C, {last['condition']}")
+        print(
+            f"Last search: "
+            f"{last.get('city', 'N/A')} - "
+            f"{last.get('temp', 'N/A')}°C, "
+            f"{last.get('condition', 'N/A')}"
+        )
     else:
         print("No previous search history.")
 
     while True:
-        city = input("\nEnter city name (or type 'history' or 'exit'): ").strip()
+        city = input(
+            "\nEnter city name (or type 'history' or 'exit'): "
+        ).strip()
 
         if city.lower() == "exit":
             print("Goodbye!")
@@ -176,7 +185,7 @@ def main():
             continue
 
         if not city:
-            print("Please enter a valid city name.")
+            print("Please enter a valid city.")
             continue
 
         weather = get_weather(city)
@@ -192,9 +201,9 @@ def main():
 
             history.insert(0, weather)
             history = history[:5]
+
             save_history(history)
 
 
 if __name__ == "__main__":
     main()
-  
